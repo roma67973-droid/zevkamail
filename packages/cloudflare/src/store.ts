@@ -63,7 +63,7 @@ async function rowToStoredEmail(
 
   if (row.has_r2 === 1 && row.r2_key) {
     if (hydrate) {
-      const obj = await env.R2.get(row.r2_key);
+      const obj = env.R2 ? await env.R2.get(row.r2_key) : null;
       if (obj) {
         try {
           const body = (await obj.json()) as { text?: string; html?: string };
@@ -103,6 +103,149 @@ async function rowToStoredEmail(
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* mail-hub: saved mailboxes                                           */
+/* ------------------------------------------------------------------ */
+
+/** "Never expires" marker for emails of permanent mailboxes (year ~2286). */
+export const FOREVER_MS = 9_999_999_999_999;
+
+export type MailboxKind = "temp" | "permanent";
+
+export interface MailboxRecord {
+  address: string;
+  kind: MailboxKind;
+  label: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface MailboxRow {
+  address: string;
+  kind: MailboxKind;
+  label: string | null;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+function rowToMailbox(r: MailboxRow): MailboxRecord {
+  return {
+    address: r.address,
+    kind: r.kind,
+    label: r.label,
+    createdAt: r.created_at_ms,
+    updatedAt: r.updated_at_ms,
+  };
+}
+
+export async function listMailboxes(env: Env): Promise<MailboxRecord[]> {
+  const res = await env.DB.prepare(
+    `SELECT * FROM mailboxes ORDER BY created_at_ms DESC LIMIT ${MAX_MAILBOXES}`,
+  ).all<MailboxRow>();
+  return (res.results ?? []).map(rowToMailbox);
+}
+
+async function getMailboxKind(env: Env, address: string): Promise<MailboxKind | null> {
+  const row = await env.DB.prepare(`SELECT kind FROM mailboxes WHERE address = ?`)
+    .bind(address)
+    .first<{ kind: MailboxKind }>();
+  return row?.kind ?? null;
+}
+
+/** Max saved mailboxes (protects D1 from runaway clients). */
+export const MAX_MAILBOXES = 1000;
+
+/**
+ * Re-time emails of an address to match the mailbox's CURRENT kind in the DB
+ * (read inside the same statement, so concurrent requests can't leave them
+ * out of sync). Idempotent:
+ *  - permanent → every email gets FOREVER_MS;
+ *  - temp / no mailbox → only emails that were FOREVER get `now + TTL`,
+ *    i.e. a full TTL of grace after unpinning, not instant deletion of old mail.
+ */
+function retimeStatement(env: Env, address: string): D1PreparedStatement {
+  const graceUntil = Date.now() + getConfig(env).emailTtlSeconds * 1000;
+  return env.DB.prepare(
+    `UPDATE emails SET expires_at_ms =
+       CASE WHEN EXISTS (SELECT 1 FROM mailboxes WHERE address = ?1 AND kind = 'permanent')
+            THEN ?2 ELSE ?3 END
+     WHERE address = ?1 AND
+       CASE WHEN EXISTS (SELECT 1 FROM mailboxes WHERE address = ?1 AND kind = 'permanent')
+            THEN expires_at_ms <> ?2 ELSE expires_at_ms = ?2 END`,
+  ).bind(address, FOREVER_MS, graceUntil);
+}
+
+export class MailboxLimitError extends Error {}
+
+/**
+ * Create or update a mailbox. Only the fields present in `patch` change
+ * (`label: null`/"" clears it). With `ifAbsent`, an existing mailbox is left
+ * untouched — used when a device uploads its old local list, so stale data
+ * can't overwrite what another device set. With an empty patch on an existing
+ * mailbox it only bumps `updated_at_ms` ("touch" = mailbox is in use).
+ */
+export async function upsertMailbox(
+  env: Env,
+  rawAddress: string,
+  patch: { kind?: MailboxKind; label?: string | null; createdAt?: number; ifAbsent?: boolean },
+): Promise<MailboxRecord> {
+  const address = normalizeAddress(rawAddress);
+  const now = Date.now();
+  const exists = await env.DB.prepare(`SELECT 1 FROM mailboxes WHERE address = ?`)
+    .bind(address)
+    .first();
+
+  if (!exists) {
+    const count = await env.DB.prepare(`SELECT COUNT(*) AS c FROM mailboxes`).first<{ c: number }>();
+    if ((count?.c ?? 0) >= MAX_MAILBOXES) throw new MailboxLimitError();
+  }
+
+  const createdAt =
+    patch.createdAt && Number.isInteger(patch.createdAt) && patch.createdAt > 0 && patch.createdAt <= now
+      ? patch.createdAt
+      : now;
+  const label = patch.label === undefined ? null : patch.label?.trim() || null;
+  const sets = ["updated_at_ms = excluded.updated_at_ms"];
+  if (patch.kind !== undefined) sets.push("kind = excluded.kind");
+  if (patch.label !== undefined) sets.push("label = excluded.label");
+  const onConflict = patch.ifAbsent ? "DO NOTHING" : `DO UPDATE SET ${sets.join(", ")}`;
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO mailboxes (address, kind, label, created_at_ms, updated_at_ms)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(address) ${onConflict}`,
+    ).bind(address, patch.kind ?? "temp", label, createdAt, now),
+    retimeStatement(env, address),
+  ]);
+
+  const row = await env.DB.prepare(`SELECT * FROM mailboxes WHERE address = ?`)
+    .bind(address)
+    .first<MailboxRow>();
+  return rowToMailbox(row!);
+}
+
+/** Mark a saved mailbox as in use (bumps updated_at_ms). Never creates one. */
+export async function touchMailbox(env: Env, rawAddress: string): Promise<boolean> {
+  const r = await env.DB.prepare(`UPDATE mailboxes SET updated_at_ms = ? WHERE address = ?`)
+    .bind(Date.now(), normalizeAddress(rawAddress))
+    .run();
+  return (r.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * Remove a mailbox from the saved list. Its emails stay; if it was permanent
+ * they go back to a normal TTL counted from now.
+ */
+export async function removeMailbox(env: Env, rawAddress: string): Promise<{ deleted: boolean }> {
+  const address = normalizeAddress(rawAddress);
+  const [del] = await env.DB.batch([
+    env.DB.prepare(`DELETE FROM mailboxes WHERE address = ?`).bind(address),
+    retimeStatement(env, address),
+  ]);
+  return { deleted: (del.meta?.changes ?? 0) > 0 };
+}
+
 /**
  * Persist an inbound email. Hot path: <100KB → single D1 INSERT, no R2 write.
  * Spill path: D1 INSERT (with previews) + 1 R2 PUT.
@@ -112,13 +255,32 @@ export async function storeEmail(env: Env, email: InboundEmail): Promise<string>
   const id = newEmailId();
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
-  const expiresAtMs = nowMs + cfg.emailTtlSeconds * 1000;
   const address = normalizeAddress(email.to);
-  const headersJson = JSON.stringify(email.headers || {});
-  const text = email.text || "";
-  const html = email.html || "";
+  // Mail to a permanent mailbox never expires. If the mailboxes table is
+  // missing (code deployed before migration 0002), fall back to the TTL
+  // instead of rejecting every incoming email.
+  let kind: MailboxKind | null = null;
+  try {
+    kind = await getMailboxKind(env, address);
+  } catch (err) {
+    console.error("[storeEmail] mailboxes lookup failed, using TTL:", err);
+  }
+  const expiresAtMs = kind === "permanent" ? FOREVER_MS : nowMs + cfg.emailTtlSeconds * 1000;
+  // Cap header/subject size so a bloated header block can't push the row
+  // over D1's 2 MB limit (and lose the whole email).
+  let headersJson = JSON.stringify(email.headers || {});
+  if (headersJson.length > HEADERS_MAX_CHARS) headersJson = "{}";
+  email = { ...email, subject: (email.subject || "").slice(0, 2000), from: (email.from || "").slice(0, 1000) };
+  let text = email.text || "";
+  let html = email.html || "";
 
-  const spill = shouldSpillToR2({
+  // Without an R2 bucket (not enabled on the account) big bodies stay in D1,
+  // trimmed so the row fits under D1's 2 MB row limit.
+  if (!env.R2) {
+    [text, html] = fitInline(text, html, INLINE_MAX_BYTES);
+  }
+
+  const spill = !!env.R2 && shouldSpillToR2({
     to: email.to,
     from: email.from,
     subject: email.subject,
@@ -130,7 +292,7 @@ export async function storeEmail(env: Env, email: InboundEmail): Promise<string>
   if (spill) {
     const key = bodyKey(id);
     const payload = JSON.stringify({ text, html });
-    await env.R2.put(key, payload, {
+    await env.R2!.put(key, payload, {
       httpMetadata: { contentType: "application/json" },
     });
     await env.DB.prepare(
@@ -275,7 +437,7 @@ export async function deleteInbox(
   const r2Keys = rows
     .filter((r) => r.has_r2 === 1 && r.r2_key)
     .map((r) => r.r2_key as string);
-  if (r2Keys.length > 0) {
+  if (r2Keys.length > 0 && env.R2) {
     await env.R2.delete(r2Keys);
   }
 
@@ -301,7 +463,7 @@ export async function deleteEmail(
     .first<{ id: string; r2_key: string | null; has_r2: number }>();
   if (!row) return { deleted: false };
 
-  if (row.has_r2 === 1 && row.r2_key) {
+  if (row.has_r2 === 1 && row.r2_key && env.R2) {
     await env.R2.delete(row.r2_key);
   }
   await env.DB.prepare(`DELETE FROM emails WHERE id = ?`).bind(id).run();
@@ -325,7 +487,7 @@ export async function deleteExpired(env: Env): Promise<{ deleted: number }> {
   const r2Keys = rows
     .filter((r) => r.has_r2 === 1 && r.r2_key)
     .map((r) => r.r2_key as string);
-  if (r2Keys.length > 0) {
+  if (r2Keys.length > 0 && env.R2) {
     await env.R2.delete(r2Keys);
   }
 
@@ -340,14 +502,46 @@ export async function deleteExpired(env: Env): Promise<{ deleted: number }> {
  * Health check used by `/api/health`. Verifies that both D1 and R2 are
  * reachable; the API uses this to populate the `redis` boolean in the
  * health response (the field name is preserved for wire compatibility
- * with the Docker server even though there is no Redis here).
+ * with the original CloakMail API even though there is no Redis here).
  */
 export async function isHealthy(env: Env): Promise<boolean> {
   try {
     await env.DB.prepare(`SELECT 1`).first();
-    await env.R2.head("__healthcheck__");
+    if (env.R2) await env.R2.head("__healthcheck__");
     return true;
   } catch {
     return false;
   }
+}
+
+/** Body budget for one D1 row when there is no R2 (D1 rows max out at 2 MB). */
+const INLINE_MAX_BYTES = 1_500_000;
+/** Headers JSON above this (chars, ≤3 bytes each → ≤192 KB) is dropped. */
+const HEADERS_MAX_CHARS = 64_000;
+const TRIM_NOTE = "\n\n[mail-hub: письмо слишком большое, конец обрезан]";
+
+/**
+ * Make text + html fit in `maxBytes` of UTF-8: keep the smaller part whole when
+ * it is reasonably small, trim the other (or both to half). Each string is
+ * encoded at most once, so big emails don't burn CPU time.
+ */
+export function fitInline(text: string, html: string, maxBytes: number): [string, string] {
+  // Fast path: one UTF-16 unit is at most 3 UTF-8 bytes.
+  if ((text.length + html.length) * 3 <= maxBytes) return [text, html];
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  const tb = enc.encode(text);
+  const hb = enc.encode(html);
+  const t = tb.length;
+  const h = hb.length;
+  if (t + h <= maxBytes) return [text, html];
+  // Cut at a byte limit; a split multi-byte char at the end decodes to U+FFFD, drop it.
+  const cut = (b: Uint8Array, bytes: number) =>
+    bytes <= 0 ? "" : dec.decode(b.subarray(0, Math.floor(bytes))).replace(/�+$/, "") + TRIM_NOTE;
+  const room = maxBytes - 200; // TRIM_NOTE is ~90 bytes
+  if (t <= h || h > maxBytes / 2) {
+    if (t > maxBytes / 2) return [cut(tb, room / 2), cut(hb, room / 2)];
+    return [text, cut(hb, room - t)];
+  }
+  return [cut(tb, room - h), html];
 }

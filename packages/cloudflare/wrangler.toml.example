@@ -1,13 +1,15 @@
-# packages/cloudflare/wrangler.toml.example
-# Static fallback for the Cloudflare Deploy Button. Copy to wrangler.toml,
-# replace D1 database_id with the value emitted by `wrangler d1 create`,
-# then run `wrangler deploy`. The recommended path is `bunx cloakmail-cli setup`,
-# which renders wrangler.toml from wrangler.toml.template instead.
+# API + mail worker. Copy to wrangler.toml (it is git-ignored), then:
+#   npx wrangler d1 create cloakmail        -> paste database_id below
+#   npx wrangler d1 migrations apply DB --remote
+#   npx wrangler secret put API_KEY         -> same value as in packages/web
+#   npx wrangler deploy
 name = "cloakmail-api"
 main = "src/worker.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
+preview_urls = false
 
+# Daily sweep of expired mail.
 [triggers]
 crons = ["0 3 * * *"]
 
@@ -17,9 +19,12 @@ database_name = "cloakmail"
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
-[[r2_buckets]]
-binding = "R2"
-bucket_name = "cloakmail-bodies"
+# R2 is optional (enabling it on an account may ask for a payment card).
+# Without it, all bodies are kept in D1 (trimmed to ~1.5 MB if larger).
+# To enable: `npx wrangler r2 bucket create cloakmail-bodies` and uncomment:
+# [[r2_buckets]]
+# binding = "R2"
+# bucket_name = "cloakmail-bodies"
 
 [vars]
 DOMAIN = "example.com"

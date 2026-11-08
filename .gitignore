@@ -5,25 +5,32 @@ node_modules/
 dist/
 build/
 .svelte-kit/
+.wrangler/
 
-# Environment
+# Secrets and local config (never commit)
+.dev.vars
+wrangler.toml
+.prod-api-key
+.site-password
 .env
 .env.local
 .env.*.local
 
-# Lockfile (optional — remove this line if you want to commit bun.lock)
-# bun.lock
+# Private notes of the owner (real URLs, keys locations)
+PRIVATE-NOTES.md
+LOCAL.md
+DEPLOY.md
+CLOUDFLARE_PLAN.md
 
-# OS files
+# Temp
+*.tmp
+*.log
+
+# OS / IDE
 .DS_Store
 Thumbs.db
-
-# IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
-
-# Logs
-*.log
-CLOUDFLARE_PLAN.md

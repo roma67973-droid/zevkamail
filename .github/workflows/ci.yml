@@ -7,52 +7,42 @@ on:
     branches: [main]
 
 jobs:
-  server-tests:
-    name: Server Tests
+  api:
+    name: API worker — types & unit tests
     runs-on: ubuntu-latest
-
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+    defaults:
+      run:
+        working-directory: packages/cloudflare
     steps:
       - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/cloudflare/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - name: Type check
+        run: npm run check
+      - name: Unit tests
+        run: npm run test:unit
 
-      - name: Install dependencies
-        run: cd packages/server && bun install
-
-      - name: Run tests
-        run: cd packages/server && bun test
-        env:
-          REDIS_URL: redis://localhost:6379
-
-  web-tests:
-    name: Web Tests & Build
+  web:
+    name: Website — types, tests & build
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: packages/web
     steps:
       - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: cd packages/web && bun install
-
-      - name: Run tests
-        run: cd packages/web && bun run test
-
-      - name: Build
-        run: cd packages/web && bun run build
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/web/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - name: Type check
+        run: npm run check
+      - name: Unit tests
+        run: npm test
+      - name: Build for Cloudflare Workers
+        run: npm run build:cloudflare

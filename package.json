@@ -1,6 +1,11 @@
 {
-  "name": "cloakmail",
-  "version": "1.1.0",
+  "name": "zevkamail",
+  "version": "2.0.0",
   "private": true,
-  "workspaces": ["packages/*"]
+  "description": "Personal disposable + permanent email hub on the Cloudflare free tier (fork of CloakMail)",
+  "license": "MIT",
+  "scripts": {
+    "check": "cd packages/web && npx svelte-check --threshold error && cd ../cloudflare && npx tsc --noEmit -p .",
+    "test": "cd packages/web && npx vitest run && cd ../cloudflare && npx vitest run -c vitest.unit.config.ts"
+  }
 }

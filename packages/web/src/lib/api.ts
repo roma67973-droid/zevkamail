@@ -1,6 +1,7 @@
 import createClient from 'openapi-fetch';
 import type { paths } from '$lib/types/api.d';
 import { env } from '$env/dynamic/public';
+import { apiFetch } from '$lib/auth-fetch';
 
 const BASE_URL = env.PUBLIC_API_URL ?? (typeof window !== 'undefined' ? '' : 'http://localhost:3000');
 
@@ -11,8 +12,8 @@ export function createApiClient(customFetch?: typeof fetch) {
 	});
 }
 
-// Default client for client-side usage
-const api = createApiClient();
+// Default client for client-side usage (sends the user to /login when the session expires)
+const api = createApiClient(typeof window !== 'undefined' ? apiFetch : undefined);
 export default api;
 
 // Re-export types for convenience

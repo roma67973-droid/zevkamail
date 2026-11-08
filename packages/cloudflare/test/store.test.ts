@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, beforeEach } from "vitest";
+﻿import { describe, test, expect, beforeAll, beforeEach } from "vitest";
 import { env, applyD1Migrations } from "cloudflare:test";
 import {
   storeEmail,
@@ -107,7 +107,7 @@ describe("store: storeEmail (spill path)", () => {
     expect(row.html_preview.length).toBe(1024);
 
     // R2 object exists with the full body
-    const obj = await env.R2.get(`bodies/${id}.json`);
+    const obj = await env.R2!.get(`bodies/${id}.json`);
     expect(obj).toBeTruthy();
     const body = (await obj!.json()) as { text: string; html: string };
     expect(body.text).toBe(text);
@@ -221,10 +221,10 @@ describe("store: deleteEmail", () => {
     const text = "w".repeat(INLINE_THRESHOLD + 1);
     const id = await storeEmail(env, makeEmail({ text }));
     const key = `bodies/${id}.json`;
-    expect(await env.R2.head(key)).toBeTruthy();
+    expect(await env.R2!.head(key)).toBeTruthy();
 
     await deleteEmail(env, id);
-    expect(await env.R2.head(key)).toBeNull();
+    expect(await env.R2!.head(key)).toBeNull();
   });
 
   test("returns false for unknown id", async () => {
@@ -252,10 +252,10 @@ describe("store: deleteInbox", () => {
     const text = "v".repeat(INLINE_THRESHOLD + 1);
     const id = await storeEmail(env, makeEmail({ to: address, text }));
     const key = `bodies/${id}.json`;
-    expect(await env.R2.head(key)).toBeTruthy();
+    expect(await env.R2!.head(key)).toBeTruthy();
 
     await deleteInbox(env, address);
-    expect(await env.R2.head(key)).toBeNull();
+    expect(await env.R2!.head(key)).toBeNull();
   });
 
   test("returns 0 for an empty inbox", async () => {
@@ -293,13 +293,13 @@ describe("store: deleteExpired (cron sweep)", () => {
     const text = "u".repeat(INLINE_THRESHOLD + 1);
     const id = await storeEmail(env, makeEmail({ text }));
     const key = `bodies/${id}.json`;
-    expect(await env.R2.head(key)).toBeTruthy();
+    expect(await env.R2!.head(key)).toBeTruthy();
 
     await env.DB.prepare(`UPDATE emails SET expires_at_ms = ? WHERE id = ?`)
       .bind(Date.now() - 1, id)
       .run();
     await deleteExpired(env);
-    expect(await env.R2.head(key)).toBeNull();
+    expect(await env.R2!.head(key)).toBeNull();
   });
 
   test("is a no-op when nothing has expired", async () => {

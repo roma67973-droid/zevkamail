@@ -1,4 +1,5 @@
-const adapterName = process.env.ADAPTER || 'node';
+// This fork deploys to Cloudflare Workers; ADAPTER=node is kept only for experiments.
+const adapterName = process.env.ADAPTER || 'cloudflare';
 const adapterModule = adapterName === 'cloudflare'
 	? await import('@sveltejs/adapter-cloudflare')
 	: await import('@sveltejs/adapter-node');

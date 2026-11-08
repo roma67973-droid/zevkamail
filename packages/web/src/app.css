@@ -4,67 +4,398 @@
 	--font-sans: 'General Sans', sans-serif;
 }
 
+/*
+ * mail-hub: тёмно-синяя тема (в духе GitHub dark).
+ * Компоненты CloakMail не переписаны: их классы (bg-white, border-black,
+ * bg-yellow-400 ...) перекрашены здесь. Эти правила стоят вне @layer,
+ * поэтому они сильнее утилит Tailwind. Поменять цвета — правь переменные ниже.
+ */
+:root {
+	--hub-bg: #0b1426;          /* фон страницы */
+	--hub-surface: #111d35;     /* карточки (было bg-white) */
+	--hub-surface-2: #172747;   /* вложенные блоки (было zinc-50/100) */
+	--hub-deep: #070e1c;        /* тёмные плашки (было bg-black) */
+	--hub-line: #263a63;        /* рамки (было border-black) */
+	--hub-text: #e6edf7;        /* основной текст (было text-black) */
+	--hub-muted: #8ea2c4;       /* второстепенный текст (было zinc-400..700) */
+	--hub-accent: #2563eb;      /* акцент (было yellow-400) */
+	--hub-accent-hover: #3b82f6;
+	--hub-accent-text: #7db4ff; /* было text-yellow-400 */
+	--hub-ok: #16a34a;
+	--hub-danger: #dc2626;
+	--hub-radius: 12px;
+	color-scheme: dark;
+}
+
 /* Base */
+html,
+body {
+	background-color: var(--hub-bg);
+	/* Верхнее свечение подстраивается под цвет акцента из настроек */
+	background-image:
+		radial-gradient(900px 480px at 85% -12%, color-mix(in srgb, var(--hub-accent) 22%, transparent) 0%, transparent 65%),
+		radial-gradient(1200px 600px at 30% -10%, #16305e 0%, transparent 60%);
+	background-attachment: fixed;
+}
+
 body {
 	font-family: 'General Sans', sans-serif;
-	background-color: #f8f8f8;
-	color: #000000;
+	color: var(--hub-text);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	-webkit-tap-highlight-color: transparent;
 }
 
-html {
-	background-color: #f8f8f8;
+/* Видимый фокус с клавиатуры. В слое base — компоненты и утилиты могут переопределить. */
+@layer base {
+	:where(a, button, [role='button'], [role='switch'], summary):focus-visible {
+		outline: 2px solid var(--hub-accent-text);
+		outline-offset: 2px;
+	}
 }
 
-/* No rounded corners anywhere */
-* {
-	border-radius: 0px !important;
+/* Карточки, кнопки, плашки: мягкая рамка и скругление вместо брутализма */
+.neo-border {
+	border: 1px solid var(--hub-line);
+	border-radius: var(--hub-radius);
+	overflow: clip;
 }
 
-/* Neo-Brutalist Utility Classes */
 .neo-shadow {
-	box-shadow: 6px 6px 0px 0px #000000;
+	box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.02);
+	border-radius: var(--hub-radius);
 }
 
 .neo-shadow-sm {
-	box-shadow: 3px 3px 0px 0px #000000;
-}
-
-.neo-border {
-	border: 3px solid #000000;
+	box-shadow: 0 4px 14px -6px rgb(0 0 0 / 0.55);
+	border-radius: 10px;
 }
 
 .neo-button {
-	transition: all 0.1s ease;
+	transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 .neo-button:active {
-	transform: translate(2px, 2px);
-	box-shadow: 2px 2px 0px 0px #000000;
+	transform: translateY(1px);
+	box-shadow: 0 2px 6px -2px rgb(0 0 0 / 0.5);
+}
+
+/* Толстые рамки апстрима делаем тонкими */
+.border-2,
+.border-4,
+.border-\[3px\] {
+	border-width: 1px;
+}
+.border-b-2,
+.border-b-4,
+.border-b-\[3px\] {
+	border-bottom-width: 1px;
+}
+.border-t-4,
+.border-t-\[3px\] {
+	border-top-width: 1px;
+}
+
+/* --- Перекраска палитры --- */
+.bg-white { background-color: var(--hub-surface); }
+.bg-zinc-50,
+.bg-zinc-100 { background-color: var(--hub-surface-2); }
+.bg-zinc-300 { background-color: var(--hub-line); }
+.bg-black { background-color: var(--hub-deep); }
+
+.bg-yellow-400 { background-color: var(--hub-accent); color: #fff; }
+.bg-green-400,
+.bg-green-500,
+.bg-emerald-500 { background-color: var(--hub-ok); color: #fff; }
+.bg-red-400 { background-color: var(--hub-danger); color: #fff; }
+.bg-amber-500 { background-color: #7c3aed; }
+
+.text-black { color: var(--hub-text); }
+.text-white { color: #fff; }
+.text-zinc-300,
+.text-zinc-400 { color: #6b80a6; }
+.text-zinc-500,
+.text-zinc-600,
+.text-zinc-700 { color: var(--hub-muted); }
+.text-yellow-400 { color: var(--hub-accent-text); }
+.text-red-600 { color: #f87171; }
+
+.border-black { border-color: var(--hub-line); }
+.border-zinc-300 { border-color: var(--hub-line); }
+
+.hover\:bg-yellow-400:hover,
+.hover\:bg-yellow-300:hover { background-color: var(--hub-accent-hover); color: #fff; }
+.hover\:bg-yellow-100:hover { background-color: rgb(59 130 246 / 0.1); }
+.hover\:bg-white:hover,
+.hover\:bg-zinc-50:hover,
+.hover\:bg-zinc-100:hover { background-color: #1d305a; }
+.hover\:bg-zinc-800:hover { background-color: #0f1b33; }
+.hover\:bg-green-400:hover { background-color: #22c55e; }
+.hover\:bg-red-500:hover { background-color: var(--hub-danger); color: #fff; }
+
+/* Письма вёрстаны под белый фон — оставляем им белый */
+iframe.bg-white { background-color: #fff; }
+
+/* --- mail-hub UI kit (новый интерфейс) ---
+ * В слое components, чтобы утилиты Tailwind (px-2, text-amber-300 ...) могли его переопределять. */
+@layer components {
+	.hub-card {
+		background:
+			linear-gradient(180deg, rgb(255 255 255 / 0.035), transparent 40%),
+			rgb(17 29 53 / 0.78);
+		border: 1px solid var(--hub-line);
+		border-radius: 18px;
+		backdrop-filter: blur(10px);
+		box-shadow:
+			0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+			0 18px 40px -24px rgb(0 0 0 / 0.7);
+	}
+
+	/* Карточка-ссылка: подъём и подсветка рамки при наведении */
+	.hub-card-link {
+		transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+	}
+	.hub-card-link:hover {
+		border-color: color-mix(in srgb, var(--hub-accent) 55%, var(--hub-line));
+		transform: translateY(-2px);
+		box-shadow:
+			0 1px 0 0 rgb(255 255 255 / 0.05) inset,
+			0 22px 40px -22px color-mix(in srgb, var(--hub-accent) 45%, black);
+	}
+
+	.hub-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		min-height: 2.5rem;
+		padding: 0.55rem 0.9rem;
+		border-radius: 11px;
+		border: 1px solid var(--hub-line);
+		background: var(--hub-surface-2);
+		color: var(--hub-text);
+		font-weight: 600;
+		font-size: 0.875rem;
+		line-height: 1.2;
+		white-space: nowrap;
+		transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.1s, box-shadow 0.15s;
+		cursor: pointer;
+		user-select: none;
+	}
+	.hub-btn:hover { background: #1d305a; border-color: #34508a; }
+	.hub-btn:active { transform: translateY(1px) scale(0.99); }
+	.hub-btn:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--hub-accent) 45%, transparent);
+	}
+	.hub-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+	.hub-btn-primary {
+		background: linear-gradient(180deg, var(--hub-accent-hover), var(--hub-accent));
+		border-color: transparent;
+		color: #fff;
+		box-shadow:
+			0 1px 0 0 rgb(255 255 255 / 0.18) inset,
+			0 10px 26px -12px var(--hub-accent);
+	}
+	.hub-btn-primary:hover {
+		background: var(--hub-accent-hover);
+		border-color: transparent;
+		box-shadow:
+			0 1px 0 0 rgb(255 255 255 / 0.2) inset,
+			0 12px 30px -10px var(--hub-accent);
+	}
+	.hub-btn-primary:disabled { box-shadow: none; }
+
+	.hub-btn-ghost { background: transparent; border-color: transparent; color: var(--hub-muted); }
+	.hub-btn-ghost:hover { background: rgb(255 255 255 / 0.06); color: var(--hub-text); border-color: transparent; }
+
+	/* Квадратная кнопка с иконкой (40px, удобно пальцем) */
+	.hub-btn-icon { padding: 0; width: 2.5rem; height: 2.5rem; flex-shrink: 0; font-size: 1rem; }
+
+	.hub-btn-danger:hover { background: rgb(220 38 38 / 0.15); border-color: rgb(220 38 38 / 0.5); color: #fca5a5; }
+
+	.hub-btn-danger-solid {
+		background: linear-gradient(180deg, #ef4444, #dc2626);
+		border-color: transparent;
+		color: #fff;
+		box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.18) inset, 0 10px 26px -12px #dc2626;
+	}
+	.hub-btn-danger-solid:hover { background: #ef4444; border-color: transparent; color: #fff; }
+
+	.hub-input {
+		width: 100%;
+		background: var(--hub-deep);
+		border: 1px solid var(--hub-line);
+		border-radius: 11px;
+		padding: 0.65rem 0.85rem;
+		color: var(--hub-text);
+		outline: none;
+		transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+	}
+	.hub-input:hover { border-color: #31497a; }
+	.hub-input:focus {
+		border-color: var(--hub-accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--hub-accent) 25%, transparent);
+	}
+	.hub-input::placeholder { color: #50648a; }
+
+	/* Поле с суффиксом (имя + @домен) — рамка и свечение на обёртке */
+	.hub-field {
+		display: flex;
+		align-items: stretch;
+		background: var(--hub-deep);
+		border: 1px solid var(--hub-line);
+		border-radius: 14px;
+		transition: border-color 0.15s, box-shadow 0.15s;
+	}
+	.hub-field:hover { border-color: #31497a; }
+	.hub-field:focus-within {
+		border-color: var(--hub-accent);
+		box-shadow: 0 0 0 4px color-mix(in srgb, var(--hub-accent) 22%, transparent);
+	}
+
+	/* Мягкая плашка-тег */
+	.hub-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 600;
+		line-height: 1.2;
+		background: rgb(255 255 255 / 0.06);
+		color: var(--hub-muted);
+		white-space: nowrap;
+	}
+	.hub-chip-accent {
+		background: color-mix(in srgb, var(--hub-accent) 16%, transparent);
+		color: var(--hub-accent-text);
+		box-shadow: 0 0 0 1px color-mix(in srgb, var(--hub-accent) 30%, transparent) inset;
+	}
+
+	/* Счётчик непрочитанных */
+	.hub-badge {
+		display: inline-grid;
+		place-items: center;
+		min-width: 1.25rem;
+		height: 1.25rem;
+		padding: 0 0.4rem;
+		border-radius: 999px;
+		font-size: 11px;
+		font-weight: 700;
+		line-height: 1;
+		color: #fff;
+		background: var(--hub-accent);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--hub-accent) 25%, transparent), 0 4px 10px -4px var(--hub-accent);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* Мерцающая заглушка при загрузке */
+	.hub-skeleton {
+		background: linear-gradient(90deg, rgb(255 255 255 / 0.04) 25%, rgb(255 255 255 / 0.09) 50%, rgb(255 255 255 / 0.04) 75%);
+		background-size: 200% 100%;
+		animation: hub-shimmer 1.4s linear infinite;
+		border-radius: 10px;
+	}
+	@keyframes hub-shimmer {
+		from { background-position: 200% 0; }
+		to { background-position: -200% 0; }
+	}
+
+	/* Иконка в цветной плитке (заголовки секций, пустые состояния) */
+	.hub-tile {
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		border-radius: 12px;
+		background: color-mix(in srgb, var(--hub-accent) 15%, transparent);
+		color: var(--hub-accent-text);
+		box-shadow: 0 0 0 1px color-mix(in srgb, var(--hub-accent) 25%, transparent) inset;
+	}
+
+	.hub-label {
+		font-size: 0.7rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--hub-muted);
+	}
+
+	.hub-accent-text { color: var(--hub-accent-text); }
+	.hub-accent-bg { background: var(--hub-accent); }
+
+	.hub-scroll { scrollbar-width: thin; scrollbar-color: var(--hub-line) transparent; }
+
+	@keyframes hub-pop {
+		from { opacity: 0; transform: translateY(4px); }
+		to { opacity: 1; transform: none; }
+	}
+	.hub-pop { animation: hub-pop 0.2s ease both; }
+
+	@keyframes hub-slide-in {
+		from { opacity: 0.4; transform: translateX(-16px); }
+		to { opacity: 1; transform: none; }
+	}
+	.hub-slide-in { animation: hub-slide-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+	@keyframes hub-float {
+		0%, 100% { transform: translateY(0); }
+		50% { transform: translateY(-5px); }
+	}
+	.hub-float { animation: hub-float 3.2s ease-in-out infinite; }
+
+	@keyframes hub-ring {
+		from { transform: scale(0.85); opacity: 0.55; }
+		to { transform: scale(1.6); opacity: 0; }
+	}
+	.hub-ring { animation: hub-ring 2.4s ease-out infinite; }
+
+	/* Текст с градиентом под цвет акцента */
+	.hub-gradient-text {
+		background: linear-gradient(100deg, var(--hub-accent-text), #fff 85%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+	}
+}
+
+/* Уважение к настройке «уменьшить движение»: без анимаций и переходов */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
 }
 
 /* Selection */
 ::selection {
-	background-color: #000000;
-	color: #facc15;
+	background-color: var(--hub-accent);
+	color: #fff;
 }
 
-/* Custom Scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar {
-	width: 12px;
+	width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-	background: #ffffff;
-	border-left: 3px solid #000000;
+	background: var(--hub-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-	background-color: #000000;
-	border: 3px solid #000000;
+	background-color: var(--hub-line);
+	border-radius: 10px;
+	border: 2px solid var(--hub-bg);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background-color: #facc15;
+	background-color: var(--hub-accent);
 }
 
 /* View Transitions */

@@ -1,118 +1,204 @@
-<p align="center">
-  <img src="https://res.cloudinary.com/deo6w3xib/image/upload/q_100/v1769594451/cloakmail_sq5pfe.webp" alt="CloakMail Logo" width="120" height="120" />
-</p>
+# zevkamail
 
-<h1 align="center">CloakMail</h1>
+[![CI](https://github.com/roma67973-droid/zevkamail/actions/workflows/ci.yml/badge.svg)](https://github.com/roma67973-droid/zevkamail/actions/workflows/ci.yml)
 
-<p align="center">
-  <strong>Self-hosted disposable email service.</strong><br />
-  Generate temporary email addresses instantly. No sign-up. No tracking. Auto-expiring.
-</p>
+Личный почтовый хаб с одноразовыми и постоянными ящиками на своём домене. Работает целиком на бесплатном тарифе Cloudflare: без VPS и без белого IP.
 
-<p align="center">
-  <a href="https://docs.cloakmail.dev">Documentation</a> &middot;
-  <a href="#features">Features</a> &middot;
-  <a href="#quick-start">Quick Start</a> &middot;
-  <a href="#license">License</a>
-</p>
+> **English summary.** zevkamail is a self-hosted personal email hub with disposable and permanent inboxes on your own domain. It runs entirely on the Cloudflare free tier: Email Routing delivers mail to a Worker, messages are stored in D1, and a SvelteKit UI on Workers reads them through a Service Binding. The whole site is locked behind a password, and the API is protected by a server-side key. It is a fork of [CloakMail](https://github.com/DreamsHive/cloakmail) (MIT) with a new Russian UI, server-synced mailboxes, permanent inboxes and security hardening.
 
-<p align="center">
-  <a href="https://github.com/DreamsHive/cloakmail/actions/workflows/ci.yml"><img src="https://github.com/DreamsHive/cloakmail/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/DreamsHive/cloakmail/releases/latest"><img src="https://img.shields.io/github/v/release/DreamsHive/cloakmail" alt="Release" /></a>
-  <a href="https://github.com/DreamsHive/cloakmail/pkgs/container/cloakmail"><img src="https://img.shields.io/badge/ghcr.io-cloakmail-blue?logo=docker" alt="GHCR" /></a>
-  <a href="https://github.com/DreamsHive/cloakmail/blob/main/LICENSE"><img src="https://img.shields.io/github/license/DreamsHive/cloakmail" alt="License" /></a>
-  <a href="https://github.com/DreamsHive/cloakmail/stargazers"><img src="https://img.shields.io/github/stars/DreamsHive/cloakmail?style=social" alt="Stars" /></a>
-</p>
+## Скриншоты
 
----
+| Главная | Ящик |
+|---|---|
+| ![Главная, десктоп](docs/screenshots/desktop-home.png) | ![Ящик с письмом, десктоп](docs/screenshots/desktop-inbox.png) |
 
-## Features
+| Мобильная версия | Вход |
+|---|---|
+| ![Мобильная версия](docs/screenshots/mobile.png) | ![Страница входа](docs/screenshots/login.png) |
 
-- **No authentication required** — generate an inbox instantly, no sign-up or login
-- **Auto-expiring** — all emails and addresses are automatically deleted after a configurable TTL
-- **Zero tracking** — no cookies, no analytics, no IP logging
-- **Built-in SMTP server** — receives emails directly, no third-party email provider needed
-- **Self-hosted** — run on your own infrastructure with full control over your data
-- **REST API** — fully documented OpenAPI spec with typed endpoints
-- **Web UI** — Accessible web interface built with SvelteKit and Tailwind CSS
-- **Docker-ready** — single `docker compose up` to run the entire stack
-- **Serverless on Cloudflare** — deploy to Workers + D1 + R2 + Email Routing on the free tier with a single command, no servers to manage
+## Возможности
 
-## Quick Start
+- Любой адрес на вашем домене принимает почту (catch-all), заводить ящики заранее не нужно.
+- Одноразовые ящики: письма удаляются через заданный срок (по умолчанию 24 часа).
+- Постоянные ящики: письма хранятся без срока.
+- Список ящиков хранится на сервере и одинаков на всех устройствах.
+- Код подтверждения из письма находится автоматически, копируется одним нажатием.
+- Внешние картинки в письмах по умолчанию заблокированы (защита от трекинг-пикселей).
+- Весь сайт закрыт паролем, API закрыт ключом.
+- Только приём почты, отправки нет.
 
-CloakMail ships with two deployment paths. Pick the one that fits your situation:
+## Что сделано в форке
 
-| Deployment | Good for | Cost |
+Основа — [CloakMail](https://github.com/DreamsHive/cloakmail). В форке переписан интерфейс и добавлено:
+
+**Интерфейс**
+- Новый тёмно-синий интерфейс на русском: боковая панель с разделами «Постоянные» и «Одноразовые», счётчики непрочитанных, список писем и панель чтения.
+- Страница настроек, выбор акцентного цвета, мобильная версия с выдвижной панелью, собственные диалоги подтверждения вместо `confirm()`.
+- Поиск кода подтверждения в теме и тексте письма с кнопкой копирования.
+- HTML письма показывается в `iframe` с `sandbox` (без скриптов и same-origin) и CSP: внешние картинки, стили и шрифты блокируются до нажатия «показать картинки», `meta refresh` вырезается.
+
+**Ящики**
+- Постоянные ящики: письмам ставится `expires_at_ms = FOREVER`, ежедневная очистка их не трогает. Если ящик открепить, письма получают обычный срок жизни, отсчитанный с этого момента.
+- Серверный список ящиков: таблица `mailboxes` в D1 (миграция `0002`), API `/api/mailboxes`.
+- Синхронизация между устройствами: локальная копия и очередь изменений на случай недоступности сервера, отслеживание изменённых полей (`kind`, `label`), чтобы устаревшие данные одного устройства не затирали другое, последовательная очередь запросов по каждому адресу.
+- Истечение сессии: при ответе 401 сайт переходит на страницу входа, несохранённые изменения ящиков не теряются.
+
+**Безопасность и инфраструктура**
+- Парольный вход на весь сайт (страницы и `/api/*`).
+- Ключ API (`X-API-Key`), сравнение за постоянное время. Ключ подставляет веб-воркер, браузер его не видит.
+- R2 необязателен: без него большие письма обрезаются примерно до 1,5 МБ и хранятся в D1.
+- Деплой на бесплатный домен с Cloudflare Email Routing.
+- Проверка типов, юнит-тесты и сборка под Cloudflare в GitHub Actions на каждый push и pull request (`.github/workflows/ci.yml`).
+
+Вариант CloakMail на Docker/Redis/Elysia (`packages/server`, `docker-compose`) из форка убран: поддерживается только развёртывание на Cloudflare Workers.
+
+## Архитектура
+
+```
+ Отправитель
+     │ SMTP
+     ▼
+ MX вашего домена ── Cloudflare Email Routing (catch-all)
+                              │
+                              ▼
+               ┌──────────────────────────────┐
+               │ Worker cloakmail-api          │
+               │  email()     postal-mime     │──► D1 (SQLite): emails, mailboxes
+               │  fetch()     Hono REST API   │──► R2 (необязательно, тела >100 КБ)
+               │  scheduled() cron 03:00 UTC  │    удаление просроченных писем
+               └──────────────▲───────────────┘
+                              │ Service Binding + X-API-Key
+               ┌──────────────┴───────────────┐
+               │ Worker cloakmail-web          │
+               │  SvelteKit, парольный вход    │
+               │  прокси /api/* → API          │
+               └──────────────▲───────────────┘
+                              │ HTTPS, сессионная кука
+                           Браузер
+```
+
+1. Письмо приходит на MX домена, правило catch-all в Email Routing передаёт его воркеру `cloakmail-api`.
+2. Обработчик `email()` разбирает MIME (`postal-mime`), отбрасывает спам (например, исполняемые вложения) и сохраняет письмо в D1. Адреса берутся из SMTP-конверта, а не из заголовков.
+3. Тело больше 100 КБ при подключённом R2 уходит в R2, в D1 остаётся превью. Без R2 тело обрезается до ~1,5 МБ (лимит строки D1 — 2 МБ).
+4. Cron раз в сутки удаляет письма с истёкшим `expires_at_ms`.
+5. Веб-воркер принимает запросы браузера, проверяет сессию и проксирует `/api/*` в API через Service Binding, добавляя `X-API-Key`.
+
+### REST API (`cloakmail-api`)
+
+Все маршруты, кроме `/api/health`, требуют заголовок `X-API-Key`, если задан секрет `API_KEY`.
+
+| Метод | Путь | Назначение |
 |---|---|---|
-| **Docker / VPS** | Full control, self-hosted servers, on-prem | Your server costs |
-| **Cloudflare Workers** | Zero servers to manage, global edge, free tier | $0 on the free tier (up to ~100k emails/day) |
+| GET | `/api/inbox/:address?page=&limit=` | Письма ящика (`limit` до 50) |
+| DELETE | `/api/inbox/:address` | Удалить все письма ящика |
+| GET | `/api/email/:id` | Одно письмо целиком |
+| DELETE | `/api/email/:id` | Удалить письмо |
+| GET | `/api/mailboxes` | Сохранённые ящики |
+| PUT | `/api/mailboxes/:address` | Создать/изменить ящик: `{ kind: "temp" \| "permanent", label, createdAt, ifAbsent, touch }` |
+| DELETE | `/api/mailboxes/:address` | Убрать ящик из списка (письма остаются) |
+| GET | `/api/health` | Состояние воркера и хранилища |
 
-### Option 1 — Docker / VPS
-
-Pull and run directly from GitHub Container Registry:
-
-```bash
-# Create a docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/DreamsHive/cloakmail/main/docker-compose.yml -o docker-compose.yml
-
-# Set your domain
-export DOMAIN=yourdomain.com
-
-# Start all services
-docker compose up -d
-```
-
-Or use the GHCR images directly:
+Пример:
 
 ```bash
-docker pull ghcr.io/dreamshive/cloakmail-server:latest
-docker pull ghcr.io/dreamshive/cloakmail-web:latest
+curl -H "X-API-Key: $API_KEY" https://cloakmail-api.<your-subdomain>.workers.dev/api/inbox/test@example.com
 ```
 
-The web UI will be available at `http://localhost:5173` and the API at `http://localhost:3000`.
+## Стек
 
-#### Environment Variables
+- Cloudflare Workers, Email Routing, D1 (SQLite), R2 (необязательно), Cron Triggers, Service Bindings
+- API: TypeScript, [Hono](https://hono.dev), [postal-mime](https://github.com/postalsys/postal-mime)
+- Веб: SvelteKit 2, Svelte 5 (runes), Tailwind CSS v4, `@sveltejs/adapter-cloudflare`
+- Инструменты: Wrangler 4, Vitest
 
-| Variable | Default | Description |
-|---|---|---|
-| `DOMAIN` | `localhost` | Email domain for receiving mail |
-| `APP_NAME` | `CloakMail` | App name displayed in the UI |
-| `EMAIL_TTL_SECONDS` | `86400` | Time before emails auto-delete |
-| `SMTP_PORT` | `25` | SMTP server port |
-| `API_PORT` | `3000` | REST API port |
-| `API_URL` | `http://server:3000` | Overrides `PUBLIC_API_URL` for the web container — useful for split deployments or reverse-proxy setups |
+## Быстрый старт (локально)
 
-See [.env.example](.env.example) for all available options.
-
-### Option 2 — Cloudflare Workers
-
-Run CloakMail entirely on Cloudflare's free tier — no servers, no Docker, no `ssh`. One command from any directory on your machine:
+Нужны Node.js и npm. Аккаунт Cloudflare и домен для локального запуска не нужны: Wrangler эмулирует Workers и D1.
 
 ```bash
-bunx cloakmail-cli setup
+# API
+cd packages/cloudflare
+npm install --legacy-peer-deps
+cp wrangler.toml.example wrangler.toml
+cp .dev.vars.example .dev.vars
+npx wrangler d1 migrations apply DB --local
+npx wrangler dev --local --port 8787
+
+# Веб (во втором терминале)
+cd packages/web
+npm install --legacy-peer-deps
+cp wrangler.toml.example wrangler.toml      # для локального запуска: PUBLIC_EMAIL_DOMAIN = "localhost"
+cp .dev.vars.example .dev.vars
+npm run build
+npx wrangler dev --local --port 8788
 ```
 
-The [`cloakmail-cli`](https://github.com/DreamsHive/cloakmail-cli) wizard handles the entire deployment end-to-end: it fetches this repo's release tarball, prompts for your Cloudflare API token + domain + hostname, provisions D1 and R2, deploys both Workers, configures Email Routing, binds your custom domain, and verifies the whole thing — in about two minutes.
+Сайт: http://localhost:8788.
 
-**Prerequisites:**
+Проверки (из корня репозитория, после `npm install` в обоих пакетах):
 
-- A Cloudflare account (free tier is fine)
-- A domain already added to Cloudflare DNS
-- [Bun](https://bun.sh/) installed locally (for `bunx`)
+```bash
+npm run check   # svelte-check для веба, tsc для API
+npm test        # юнит-тесты обоих пакетов
+```
 
-**What you get:**
+Подробности, эмуляция входящего письма и переменные окружения — в [docs/local-development.md](docs/local-development.md).
 
-- A web UI at whatever hostname you pick (e.g. `https://inbox.yourdomain.com`)
-- Catch-all email routing on your domain — any address `*@yourdomain.com` lands in a disposable inbox
-- Automatic TLS via Cloudflare
-- ~100k emails/day on the free tier (D1 + R2 smart-split storage)
+## Деплой
 
-The Docker and Cloudflare paths are fully independent — pick whichever fits your setup, or even run both for different domains.
+Кратко:
 
-## Documentation
+1. `wrangler login`, создать базу D1, вписать `database_id` в `packages/cloudflare/wrangler.toml`, применить миграции `--remote`.
+2. Задать секрет `API_KEY` в обоих воркерах (одинаковый) и `SITE_PASSWORD` в веб-воркере.
+3. Задеплоить `cloakmail-api`, затем `cloakmail-web`.
+4. Добавить домен в Cloudflare, включить Email Routing, правило catch-all → воркер `cloakmail-api`.
 
-For full setup guides, API reference, and deployment instructions, visit the official documentation at [docs.cloakmail.dev](https://docs.cloakmail.dev).
+Пошаговая инструкция: [docs/deploy.md](docs/deploy.md).
 
-## License
+## Безопасность
 
-This project is licensed under the [MIT License](LICENSE).
+- **Пароль на сайт.** Секрет `SITE_PASSWORD` закрывает все страницы и `/api/*`. Сессия — кука с HMAC-подписью на 30 дней (`HttpOnly`, `Secure`, `SameSite=Lax`). Ключ подписи — сам пароль, поэтому смена пароля разлогинивает все устройства. Неверный пароль отвечает с задержкой 1,5 с. Параметр `next` после входа принимает только пути этого же сайта (защита от open redirect). Выход — только POST.
+- **Fail closed.** Если веб-воркер развёрнут без `SITE_PASSWORD`, он отвечает 503, а не открывает сайт. `ALLOW_OPEN_SITE=1` отключает эту проверку и предназначен только для локальной разработки.
+- **Ключ API.** Секрет `API_KEY` защищает прямой доступ к API-воркеру (`*.workers.dev`) для скриптов и CLI. Браузер ключ не получает: его добавляет веб-воркер на сервере.
+- **Письма.** HTML показывается в изолированном `iframe` с CSP, внешние ресурсы заблокированы по умолчанию, ссылки открываются в новой вкладке без referrer.
+
+## Ограничения
+
+- Только приём, отправки писем нет.
+- Некоторые сайты не принимают адреса на бесплатных доменах.
+- Без R2 тело письма больше ~1,5 МБ обрезается.
+- Интеграционные тесты воркера из CloakMail (`packages/cloudflare/test/*.test.ts`, `@cloudflare/vitest-pool-workers` 0.6) сейчас не запускаются с новым `workerd`. Работают юнит-тесты (`npm test` в корне) и проверка типов (`npm run check`).
+- `MAX_EMAIL_SIZE_MB` читается в конфигурации, но в варианте на Workers размер письма им не ограничивается (ограничения задаёт сам Email Routing).
+
+## Структура проекта
+
+```
+.github/workflows/ci.yml        CI: типы, юнит-тесты, сборка
+packages/
+├── cloudflare/                 @zevkamail/api — Worker cloakmail-api
+│   ├── src/
+│   │   ├── worker.ts           точка входа: fetch / email / scheduled
+│   │   ├── email.ts            приём письма, разбор MIME, спам-фильтр
+│   │   ├── api.ts              REST API на Hono, проверка X-API-Key
+│   │   ├── store.ts            работа с D1/R2, сроки хранения, ящики
+│   │   ├── spam.ts, config.ts, types.ts, utils/
+│   ├── migrations/             0001_init.sql (emails), 0002_mailboxes.sql
+│   ├── test/                   интеграционные тесты (vitest-pool-workers)
+│   ├── test/unit/              юнит-тесты в Node (обрезка тел писем)
+│   ├── wrangler.toml.example
+│   └── .dev.vars.example
+└── web/                        @zevkamail/web — Worker cloakmail-web (SvelteKit)
+    ├── src/
+    │   ├── hooks.server.ts     парольный вход и прокси /api/* в API
+    │   ├── lib/server/gate.ts  сессии, страница входа
+    │   ├── lib/stores/         hub.svelte.ts (ящики, синхронизация, настройки), dialog.svelte.ts
+    │   ├── lib/components/hub/ боковая панель, диалоги, аватары
+    │   ├── lib/utils/          утилиты и их юнит-тесты
+    │   └── routes/             /, /inbox/[address], /settings
+    ├── wrangler.toml.example
+    └── .dev.vars.example
+```
+
+## Авторы и лицензия
+
+Проект основан на [CloakMail](https://github.com/DreamsHive/cloakmail) от DreamsHive, распространяемом по лицензии MIT. Форк сохраняет исходную лицензию: см. [LICENSE](LICENSE) (Copyright (c) 2025 DreamsHive). Изменения в форке распространяются на тех же условиях MIT.

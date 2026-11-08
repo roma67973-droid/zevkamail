@@ -2,10 +2,11 @@ import PostalMime from "postal-mime";
 import type { Env, InboundEmail } from "./types";
 import { isSpam } from "./spam";
 import { storeEmail } from "./store";
+import { getConfig } from "./config";
 
 /**
  * Cloudflare Email Routing entrypoint. Configured via `wrangler.toml` and
- * the catch-all rule provisioned by `cloakmail-cli setup`. Reads the raw
+ * the Email Routing catch-all rule (all addresses -> this Worker). Reads the raw
  * MIME body off the inbound message, runs the spam filter, and persists
  * the result via the D1+R2 store.
  */
@@ -14,6 +15,13 @@ export async function handleEmail(
   env: Env,
   _ctx: ExecutionContext,
 ): Promise<void> {
+  // Reject oversized mail before reading it (the sender gets a bounce).
+  const maxBytes = getConfig(env).maxEmailSizeMb * 1024 * 1024;
+  if (message.rawSize > maxBytes) {
+    message.setReject(`Message too large (limit ${getConfig(env).maxEmailSizeMb} MB)`);
+    return;
+  }
+
   // Read the raw stream into a buffer for postal-mime to parse.
   const rawArrayBuffer = await new Response(message.raw).arrayBuffer();
   const rawBytes = new Uint8Array(rawArrayBuffer);
@@ -51,7 +59,7 @@ export async function handleEmail(
 
 /**
  * Flatten postal-mime's parsed header list into a plain `Record<string,string>`
- * so the wire shape matches what mailparser produces in `packages/server`.
+ * for the API response.
  * Repeated headers are joined with `, ` (the same convention as Node's
  * built-in HTTP header collapsing) so we never lose information.
  */

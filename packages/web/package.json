@@ -1,18 +1,18 @@
 {
-	"name": "@cloakmail/web",
+	"name": "@zevkamail/web",
 	"private": true,
-	"version": "1.1.0",
+	"version": "2.0.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"build:cloudflare": "ADAPTER=cloudflare vite build",
-		"deploy:cloudflare": "ADAPTER=cloudflare vite build && wrangler deploy",
+		"build:cloudflare": "vite build",
+		"deploy:cloudflare": "vite build && wrangler deploy",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"generate:api": "openapi-typescript http://localhost:3000/swagger/json -o src/lib/types/api.d.ts",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"check": "svelte-kit sync && svelte-check --threshold error"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
@@ -26,7 +26,8 @@
 		"tailwindcss": "^4",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1",
-		"vitest": "^4.0.18"
+		"vitest": "^4.0.18",
+		"wrangler": "^4.158.0"
 	},
 	"dependencies": {
 		"@iconify/svelte": "^5.2.1",

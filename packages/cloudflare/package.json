@@ -1,6 +1,6 @@
 {
-  "name": "@cloakmail/cloudflare",
-  "version": "1.1.0",
+  "name": "@zevkamail/api",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,17 +9,19 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate:local": "wrangler d1 migrations apply DB --local",
-    "migrate:remote": "wrangler d1 migrations apply DB --remote"
+    "migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "test:unit": "vitest run -c vitest.unit.config.ts",
+    "check": "tsc --noEmit -p ."
   },
   "dependencies": {
     "hono": "^4.6.14",
     "postal-mime": "^2.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250109.0",
     "@cloudflare/vitest-pool-workers": "^0.6.0",
+    "@cloudflare/workers-types": "^4.20250109.0",
     "typescript": "^5.7.0",
     "vitest": "~2.1.9",
-    "wrangler": "^3.99.0"
+    "wrangler": "^4.158.0"
   }
 }

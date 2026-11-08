@@ -3,3 +3,6 @@
 DOMAIN="localhost"
 EMAIL_TTL_SECONDS="86400"
 MAX_EMAIL_SIZE_MB="10"
+
+# Optional: protect /api/* with X-API-Key (leave empty for open API)
+API_KEY=""

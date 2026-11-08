@@ -32,8 +32,11 @@ export interface SpamResult {
 
 export interface Env {
   DB: D1Database;
-  R2: R2Bucket;
+  /** Optional: without it big bodies are trimmed and kept in D1. */
+  R2?: R2Bucket;
   DOMAIN: string;
   EMAIL_TTL_SECONDS: string;
   MAX_EMAIL_SIZE_MB: string;
+  /** Optional. When set, /api/* (except /api/health) requires X-API-Key. */
+  API_KEY?: string;
 }

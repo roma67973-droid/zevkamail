@@ -1,0 +1,9 @@
+# Copy to .dev.vars (git-ignored) for `wrangler dev`.
+# Must match API_KEY in packages/cloudflare/.dev.vars.
+API_KEY=""
+
+# Local only: no password lock. Never set this in production.
+ALLOW_OPEN_SITE="1"
+
+# To test the login page locally, remove ALLOW_OPEN_SITE and set:
+# SITE_PASSWORD="any-local-password"

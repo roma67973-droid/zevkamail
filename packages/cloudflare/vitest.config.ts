@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineWorkersConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    exclude: ["test/unit/**"], // plain Node tests: vitest.unit.config.ts
     poolOptions: {
       workers: {
         singleWorker: true,

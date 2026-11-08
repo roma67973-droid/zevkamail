@@ -18,6 +18,13 @@ export function bindingFetch(event: RequestEvent): typeof fetch {
 	return async (input, init) => {
 		const url = typeof input === 'string' ? input : (input as Request).url;
 		const pathOnly = url.replace(/^https?:\/\/[^/]+/, '');
-		return api.fetch(new Request(`https://api.internal${pathOnly}`, init));
+		// openapi-fetch passes a Request without init: keep its method/body/headers.
+		const req = new Request(
+			`https://api.internal${pathOnly}`,
+			input instanceof Request ? input : init,
+		);
+		const key = (event.platform as any)?.env?.API_KEY;
+		if (key) req.headers.set('X-API-Key', key);
+		return api.fetch(req);
 	};
 }
